@@ -67,5 +67,36 @@ fn main() {
 
     println!("if you made it this far then it read the image woah");
 
+    let rgb = img.as_rgb8().unwrap();
+    let w = rgb.width() as usize;
+    let h = rgb.height() as usize;
+    let mut ascii_img = vec![vec![' '; w]; h];
+
+    for i in 0..w {
+        for j in 0..h {
+            let px = rgb.get_pixel(i as u32, j as u32);
+            let px_avg: u8 = (px[0] + px[1] + px[2]) / 3;
+            let val = match px_avg {
+                0  ...17  => ' ',
+                18 ...34  => '.',
+                35 ...51  => ',',
+                52 ...68  => ':',
+                69 ...85  => ';',
+                86 ...102 => '-',
+                103...119 => '=',
+                120...136 => '+',
+                137...153 => '!',
+                154...170 => '*',
+                171...187 => '#',
+                188...204 => '%',
+                205...221 => '8',
+                222...237 => '@',
+                238...255 => '$',
+            };
+            ascii_img[j][i] = val;
+        }
+    }
+
     img.save(output).ok();
+    println!("{:?}", ascii_img)
 }
