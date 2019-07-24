@@ -2,6 +2,8 @@ extern crate argparse;
 extern crate image;
 
 use argparse::{ArgumentParser, StoreTrue, Store};
+use std::io::prelude::*;
+use std::fs;
 //use image::{save_buffer_with_format, ColorType};
 
 fn main() {
@@ -54,49 +56,96 @@ fn main() {
     }
 
     if verbose {
-        println!("add verbosity thing later lol");
+        println!("it didnt crash");
+        println!("{}\n{:?}", input, dimensions);
+        println!("image time yay");
     }
-    println!("it didnt crash");
-    println!("{}\n{:?}", input, dimensions);
-    println!("image time yay");
+
 
     let mut img = image::open(input).unwrap();
     if do_resize {
         img = img.resize_exact(dimensions[0], dimensions[1], image::imageops::FilterType::Lanczos3)
     }
+    
+    if verbose {
+        println!("if you made it this far then it read the image woah");
+    }
 
-    println!("if you made it this far then it read the image woah");
+    let _i = img.as_rgba8();
+    let rgb: &image::ImageBuffer<image::Rgba<u8>, std::vec::Vec<u8>>;
+    match _i {
+        None => {
+            println!("i broke lol");
+            std::process::exit(1);
+            },
+        Some(x) => {
+            //println!("{:?}", x);
+            rgb = x;
+            }
+    }
 
-    let rgb = img.as_rgb8().unwrap();
     let w = rgb.width() as usize;
     let h = rgb.height() as usize;
-    let mut ascii_img = vec![vec![' '; w]; h];
+    let mut ascii_img = vec![vec![0u8; w]; h];
+
+    let px = rgb.to_vec();
+    let mut inc: usize = 0;
+
+    if verbose {
+        println!("{}", px.len());
+        println!("{}, {}, {}, {}", px[0], px[1], px[2], px[3]);
+        println!("{}, {}, {}, {}", px[396], px[397], px[398], px[399]);
+    }
 
     for i in 0..w {
         for j in 0..h {
-            let px = rgb.get_pixel(i as u32, j as u32);
-            let px_avg: u8 = (px[0] + px[1] + px[2]) / 3;
+            //let px = rgb.get_pixel(i as u32, j as u32);
+            let offset = inc*4;
+            let px_val: u16 = px[offset] as u16 + 
+                               px[offset+1] as u16 + 
+                               px[offset+2] as u16;
+            let px_avg: u8 = if (px_val / 3) <= 255 {(px_val / 3) as u8} else {255};
+            if verbose {
+                println!("{}:{}:{},{},{}", offset+2, px_avg, px[offset], px[offset+1], px[offset+2]);
+            }
             let val = match px_avg {
-                0  ...17  => ' ',
-                18 ...34  => '.',
-                35 ...51  => ',',
-                52 ...68  => ':',
-                69 ...85  => ';',
-                86 ...102 => '-',
-                103...119 => '=',
+                0  ...17  => '$',
+                18 ...34  => '@',
+                35 ...51  => '8',
+                52 ...68  => '%',
+                69 ...85  => '#',
+                86 ...102 => '*',
+                103...119 => '!',
                 120...136 => '+',
-                137...153 => '!',
-                154...170 => '*',
-                171...187 => '#',
-                188...204 => '%',
-                205...221 => '8',
-                222...237 => '@',
-                238...255 => '$',
+                137...153 => '=',
+                154...170 => '-',
+                171...187 => ';',
+                188...204 => ':',
+                205...221 => ',',
+                222...237 => '.',
+                238...255 => ' ',
             };
-            ascii_img[j][i] = val;
+            inc += 1;
+            // encode data to u8 on the fly because im dumb lol
+            let mut t = [0; 1];
+            val.encode_utf8(&mut t);
+            ascii_img[j][i] = t[0];
         }
     }
 
-    img.save(output).ok();
-    println!("{:?}", ascii_img)
+    fn save_txt(a_vec: std::vec::Vec<std::vec::Vec<u8>>, output: String) {
+        let mut a_file = fs::File::create(output).unwrap();
+        let height = a_vec.len();
+        let width = a_vec[0].len();
+        for line in a_vec.iter() {
+            for px in line.iter() {
+                a_file.write(px).unwrap();
+            }
+        }
+        
+    }
+
+    //img.save(output).ok();
+    //println!("{:?}", ascii_img)
+    save_txt(ascii_img, output);
 }
