@@ -6,6 +6,8 @@ use std::io::prelude::*;
 use std::fs;
 //use image::{save_buffer_with_format, ColorType};
 
+#[allow(non_snake_case)] // becuase this gets annoying to me
+
 fn main() {
     let mut verbose = false;
     let mut output = "output.txt".to_string();
@@ -97,18 +99,60 @@ fn main() {
         println!("{}, {}, {}, {}", px[396], px[397], px[398], px[399]);
     }
 
-    for i in 0..w {
-        for j in 0..h {
+    fn sRGBtoLin(c: f64) -> f64 {
+        if c <= 0.04045_f64 {
+            return c / 12.92_f64;
+        } else {
+            let mut cp: f64 = c + 0.055_f64;
+            cp /= 1.055;
+            return cp.powf(2.4_f64)
+        }
+    }
+
+    fn YtoLstar(Y: f64) -> f64 {
+        let m: f64 = 216_f64/24389_f64;
+        let t0: f64 = 24389_f64/27_f64;
+        if Y <= m {
+            return Y * t0;
+        } else {
+            let Yr3 = Y.powf(1_f64/3_f64);
+            return Yr3 * 116_f64 - 13_f64;
+        }
+    }
+
+    fn rgb2lum(r: u8, g: u8, b: u8) -> u8 {
+        let vR = r as f64 / 255_f64; // convert all integer values to decimal 0.0 ~ 1.0
+        let vG = g as f64 / 255_f64;
+        let vB = b as f64 / 255_f64;
+
+        let cR = 0.2126_f64; // sRGB coefficients
+        let cG = 0.7152_f64;
+        let cB = 0.0722_f64;
+
+        let Y = cR * sRGBtoLin(vR) + // luminance
+                cG * sRGBtoLin(vG) +
+                cB * sRGBtoLin(vB);
+
+        let Lstar = YtoLstar(Y); // perceived luminance
+
+        let mut Lstar_u8 = (Lstar * 2.55_f64) as u8; // convert to byte
+
+        if Lstar_u8 >= 255 {
+            Lstar_u8 = 255;
+        }
+
+        return Lstar_u8;
+    }
+
+    for j in 0..h {
+        for i in 0..w {
             //let px = rgb.get_pixel(i as u32, j as u32);
             let offset = inc*4;
-            let px_val: u16 = px[offset] as u16 + 
-                               px[offset+1] as u16 + 
-                               px[offset+2] as u16;
-            let px_avg: u8 = if (px_val / 3) <= 255 {(px_val / 3) as u8} else {255};
+            let px_val = rgb2lum(px[offset], px[offset+1], px[offset+3]);
             if verbose {
-                println!("{}:{}:{},{},{}", offset+2, px_avg, px[offset], px[offset+1], px[offset+2]);
+                println!("{}:{}:{},{},{}", offset+2, px_val, px[offset], px[offset+1], px[offset+2]);
             }
-            let val = match px_avg {
+            let val = match px_val {
                 0  ...17  => '$',
                 18 ...34  => '@',
                 35 ...51  => '8',
@@ -135,12 +179,9 @@ fn main() {
 
     fn save_txt(a_vec: std::vec::Vec<std::vec::Vec<u8>>, output: String) {
         let mut a_file = fs::File::create(output).unwrap();
-        let height = a_vec.len();
-        let width = a_vec[0].len();
         for line in a_vec.iter() {
-            for px in line.iter() {
-                a_file.write(px).unwrap();
-            }
+            a_file.write_all(&line).unwrap();
+            a_file.write(b"\n").unwrap();
         }
         
     }
